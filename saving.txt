@@ -1,0 +1,52 @@
+docker run --rm -it \
+                --shm-size=1g \
+                --ulimit memlock=-1 \
+                --ulimit stack=67108864 \
+                --gpus all \
+                -p 8080:8080 \
+                -p 8081:8081 \
+                --name mar \
+                -v $(pwd)/model-store:/home/model-server/model-store \
+                -v $(pwd)/examples:/home/model-server/examples \
+                -v $(pwd)/ts:/home/model-server/ts  pytorch/torchserve:dev-gpu
+
+torch-model-archiver --model-name clean --version 1.0 --model-file examples/GAN/gfpgan/gfpganv1_clean_arch.py --serialized-file examples/GAN/model_state.pth --export-path /home/model-server/model-store --handler ts/torch_handler/generative.py  --extra-files examples/GAN/gfpgan/stylegan2_clean_arch.py --requirements-file examples/GAN/requirements.txt
+
+docker run --rm --shm-size=10g \
+        --ulimit memlock=-1 \
+        --ulimit stack=6710886400 \
+        --gpus device=0 \
+        -p8080:8080 \
+        -p8081:8081 \
+        -p8082:8082 \
+        -p7070:7070 \
+        -p7071:7071 \
+        --mount type=bind,source=/home/aman/Desktop/serve/model-store,target=/tmp/models pytorch/torchserve:latest torchserve --model-store=/tmp/models 
+
+
+curl -X POST  "http://localhost:8081/models?url=clean.mar"
+curl -X DELETE http://localhost:8081/models/clean/1.0
+curl -v -X PUT "http://localhost:8081/models/clean?min_worker=1"
+curl http://localhost:8081/models/clean
+
+curl http://localhost:8080/predictions/clean -T /home/aman/Desktop/serve/examples/image.jpg
+
+
+export TS_CONFIG_FILE=/home/model-server/config.properties
+
+docker run --rm --shm-size=1g \
+        --ulimit memlock=-1 \
+        --ulimit stack=67108864 \
+        -p8080:8080 \
+        -p8081:8081 \
+        -p8082:8082 \
+        -p7070:7070 \
+        -p7071:7071 \
+        -v $(pwd)/model-store:/home/model-server/model-store -v $(pwd)/examples:/home/model-server/examples \
+        --mount type=bind,source=/home/aman/Desktop/serve/model-store,target=/tmp/models pytorch/torchserve torchserve --model-store=/tmp/models
+
+curl -X POST  "http://localhost:8081/models?url=FemaleExp1_params_0273000.mar&initial_workers=1"
+curl -X DELETE http://localhost:8081/models/FemaleExp1_params_0273000
+
+curl http://localhost:8081/models/FemaleExp1_params_0273000
+
